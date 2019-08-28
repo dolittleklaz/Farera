@@ -1,0 +1,40 @@
+/****** Script for SelectTopNRows command from SSMS  ******/
+with A as (SELECT TOP (1000) [State]
+      ,[Location]
+      ,substring (Pastor,1, charindex (' ', Pastor) -1) as FirstName
+	  , substring (Pastor,charindex(' ',Pastor) +1, len(Pastor)) as LastName
+      ,[Address]
+      ,[Phone_Number]
+      ,[Email]
+  FROM [DLBC Staging].[dbo].[STG_CHURCH_ADDRESS]),
+  B  AS 
+  (SELECT
+   STATE
+  ,LOCATION
+  
+ ,CASE WHEN FIRSTNAME = 'Overseer:' THEN
+   SUBSTRING(LASTNAME,1,CHARINDEX(' ',LASTNAME) -1)
+   WHEN FIRSTNAME = 'Pastor:' THEN
+   SUBSTRING(LASTNAME,1,CHARINDEX(' ',LASTNAME) -1)
+   ELSE FIRSTNAME END	FIRSTNAME
+  , CASE WHEN FIRSTNAME = 'Overseer:' THEN
+   SUBSTRING(LASTNAME,CHARINDEX(' ',LASTNAME) +1,LEN(LASTNAME))
+   WHEN FIRSTNAME = 'Pastor:' THEN
+   SUBSTRING(LASTNAME,CHARINDEX(' ',LASTNAME) +1,LEN(LASTNAME))
+   ELSE LASTNAME END LASTNAME
+  ,ADDRESS
+  ,PHONE_NUMBER
+  ,EMAIL
+  FROM A)
+
+  SELECT
+  STATE
+  ,LOCATION
+  ,FIRSTNAME
+  ,CASE WHEN LASTNAME IS NOT NULL THEN
+   SUBSTRING(LASTNAME,CHARINDEX(' ',LASTNAME) +1,LEN(LASTNAME))
+   ELSE LASTNAME END LASTNAME
+  ,ADDRESS
+  ,PHONE_NUMBER
+  ,EMAIL
+  FROM B; 
