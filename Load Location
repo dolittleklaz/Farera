@@ -1,0 +1,208 @@
+/****** Script for SelectTopNRows command from SSMS  ******/
+CREATE PROCEDURE Load_Loc_Member
+AS 
+BEGIN 
+WITH Main as (
+SELECT [LOCATION]
+      ,[ADDRESS]
+	  ,[ADDRESS LINE 2]
+	  ,[CITY]
+	  ,[STATE]
+	  ,'USA' as Country
+	  ,user as createuser
+      ,getdate() as createdate
+      ,[PHONE_NUMBER]
+      ,[ZIP_CODE]
+	  ,row_number() over (partition by location order by location ) as unique_loc
+FROM [DLBC_Stg].[dbo].[Church Location Stg])
+
+INSERT INTO [DLBC_Dev].[dbo].[LOCATION](
+       [LOCATION_NM]
+      ,[ADDRESS_LINE_1_TXT]
+      ,[ADDRESS_LINE_2]
+      ,[CITY_NM]
+      ,[STATE_NM]
+      ,[COUNTRY_NM]
+      ,[CREATE_USER_ID]
+      ,[CREATE_DT]
+      ,[PRIMARY_PHONE]
+      ,[ZIP_CODE])
+SELECT 
+ [LOCATION]
+      ,[ADDRESS]
+	  ,[ADDRESS LINE 2]
+	  ,[CITY]
+	  ,[STATE]
+	  ,Country
+	  ,createuser
+      ,createdate
+      ,[PHONE_NUMBER]
+      ,[ZIP_CODE]
+	FROM Main
+	where unique_loc = 1
+END;
+BEGIN
+
+GO
+------Load Member Table
+
+/****** Script for SelectTopNRows command from SSMS  ******/
+WITH Main as 
+(SELECT
+
+substring([Name],1,charindex(' ',[Name]))   as LastName
+,substring ([Name],charindex(' ',[Name]) +1, len([Name])) as FirstName
+      ,[Gender]
+      ,[Category]
+      ,[Date] as AttendanceDate
+      ,[Service Category]
+      ,[Attendance]
+      ,[Tithe via Check] as TitheCheck
+      ,[Tithe via Cash] as TitheCash
+      ,[Offering via Check] as OfferingCheck
+      ,[Offering via Cash] as OfferingCash
+  FROM [DLBC_Stg].[dbo].[2016 Report Staging]),
+  SubMain as ( SELECT
+  LastName
+  ,FirstName
+  ,Gender
+  ,category
+  ,AttendanceDate
+  ,Attendance
+  ,[Service Category]
+  ,TitheCheck
+  ,TitheCash
+  ,OfferingCheck
+  ,OfferingCash
+  ,row_number() over (partition by LastName,FirstName order by AttendanceDate asc) as rowCnt
+  FROM Main),
+  SubMini as (  SELECT DISTINCT 
+  0 as parentID
+  ,isnull(FirstName, 'N/A') as FirstName
+  , 'N/A' as MiddleName
+,isnull(LastName, 'N/A') as LastName
+,'12/31/2019' as DOB
+,'deeperlifemanassas@yahoo.com' as Email
+,'000-000-0000' as PhoneNo
+,user as createuser
+,getdate() as createdate
+,user as lastupdateuser
+,getdate() lastupdatedate
+,isnull(Gender, 'N') as Gender
+,'Dumfries VA' as LocationName
+FROM SubMain
+WHERE rowCnt = 1)
+INSERT INTO [DLBC_Dev].[dbo].[MEMBER] (
+       [PARENT_MEMBER_ID]
+      ,[PRIMARY_FIRST_NM]
+      ,[PRIMARY_MIDDEL_NM]
+      ,[PRIMARY_LAST_NM]
+      ,[DOB]
+      ,[PRIMARY_EMAIL_ADDRESS_TXT]
+      ,[PRIMARY_PHONE_NO]
+      ,[CREATE_USER_ID]
+      ,[CREATE_DT]
+      ,[LAST_UPDATE_USER_ID]
+      ,[LAST_UPDATE_DT]
+      ,[LOCATION_ID]
+	  ,[GENDER]) 
+  SELECT
+   parentID
+  ,FirstName
+  ,MiddleName
+  ,LastName
+  ,DOB
+  ,Email
+  ,PhoneNo
+  ,createuser
+  ,createdate
+  ,lastupdateuser
+ ,lastupdatedate
+ ,LOCATION_ID
+ ,Gender
+FROM SubMini S LEFT OUTER JOIN [DLBC_Dev].[dbo].[LOCATION] L
+ON upper(S.LocationName) = upper(L.LOCATION_NM);
+
+--Alter Table [DLBC_Dev].[dbo].[MEMBER] 
+--DROP COLUMN GENDER;
+
+--Alter Table [DLBC_Dev].[dbo].[MEMBER]
+--Add GENDER varchar(1);
+
+
+--ALter Table [DLBC_Dev].[dbo].[MEMBER]
+--drop [FK_MEM_MEM];
+
+--------Create and Load Payment Type Table-------------
+
+
+USE [DLBC_Dev]
+GO
+
+/****** Object:  Table [dbo].[MEMBER_TYPE]    Script Date: 9/2/2019 9:45:04 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[PAYMENT_TYPE](
+	[PAYMENT_TYPE_CODE] 	[varchar](10) NOT NULL,
+	[PAYMENT_TYP] [varchar](50) NOT NULL,
+	[DESCRIPTION_TXT] [varchar](30) NOT NULL,
+	[CREATE_USER_ID] [varchar](30) NOT NULL,
+	[CREATE_DT] [date] NOT NULL,
+ CONSTRAINT [PK_PAYMENT_TYPE] PRIMARY KEY NONCLUSTERED 
+(
+	[PAYMENT_TYPE_CODE] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[PAYMENT_TYPE] ADD  DEFAULT ('sysdate') FOR [CREATE_DT]
+GO
+
+INSERT INTO [dbo].[PAYMENT_TYPE]
+VALUES('CHK','CHECK','RECEIVED VIA CHECK',USER,GETDATE()),
+      ('CA','CASH','RECEIVED VIA CASH',USER,GETDATE()),
+	  ('MO','MONEY ORDER','RECEIVED VIA MONEY ORDER',USER,GETDATE())
+
+Alter Table [dbo].[MEMBER_CONTRIBUTION]
+Add PAYMENT_TYPE_CODE varchar(10) not null;
+
+Alter Table [dbo].[MEMBER_CONTRIBUTION]
+Add constraint FK_PT_MC Foreign Key(PAYMENT_TYPE_CODE) references [dbo].[PAYMENT_TYPE]
+
+----Reset Identity COLUMN
+
+DBCC CHECKIDENT ('Emp', RESEED, 1)
+
+--- Split single Address into multiple Address fields
+
+CREATE TABLE #Table (ID INT IDENTITY, StreetAddress VARCHAR(MAX))
+
+DECLARE @I INT = 1000000
+
+WHILE (@I) > 0
+BEGIN
+       INSERT INTO #Table (StreetAddress) VALUES ('123 Fake St, BigCity, My State, 12345')
+       SET @I = @I -1
+END
+
+
+SELECT ID,
+       [1] AS Street,
+       [2] AS City, 
+       [3] AS State, 
+       [4] AS Code
+FROM 
+(
+       SELECT ID, value, ROW_NUMBER() OVER (PARTITION BY ID ORDER BY ID) AS Rn
+       FROM #Table
+       CROSS APPLY STRING_SPLIT(REPLACE(StreetAddress, ', ', ','), ',')
+) src
+PIVOT
+(
+       MAX(Value) FOR Rn IN ([1], [2], [3], [4])
+) pv
+
